@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>OBS用カウンター</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -10,6 +10,11 @@
       background: transparent;
       margin: 0;
       padding: 0;
+      touch-action: manipulation;
+    }
+    button {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
   </style>
 </head>
