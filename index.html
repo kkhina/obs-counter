@@ -1,3 +1,49 @@
+# Vercel用OBSカウンター - ファイル一式
+
+## 1. package.json
+```json
+{
+  "name": "obs-counter",
+  "version": "1.0.0",
+  "type": "module"
+}
+```
+
+## 2. api/counter.js
+```javascript
+import { kv } from '@vercel/kv';
+
+export default async function handler(req, res) {
+  // CORSヘッダーを設定
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const KEY = 'obs-counter-value';
+
+  if (req.method === 'GET') {
+    // カウンターの値を取得
+    const value = await kv.get(KEY) || 1;
+    return res.json({ value: parseInt(value) });
+  }
+
+  if (req.method === 'POST') {
+    // カウンターの値を更新
+    const { value } = req.body;
+    await kv.set(KEY, value);
+    return res.json({ value: parseInt(value) });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+```
+
+## 3. index.html
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -23,6 +69,10 @@
   
   <script type="module">
     const API_URL = '/api/counter';
+    
+    // URLパラメータを取得
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode') || 'full'; // full, display, control
     
     // 半角数字を全角数字に変換
     function toFullWidth(num) {
@@ -67,6 +117,78 @@
 
     function render() {
       const root = document.getElementById('root');
+      
+      // mode=display: OBS表示用（文章のみ）
+      if (mode === 'display') {
+        root.innerHTML = `
+          <div class="flex items-center justify-center min-h-screen bg-transparent p-8">
+            <div class="text-center" style="
+              font-size: 64px;
+              font-weight: bold;
+              color: white;
+              text-shadow: 
+                -4px -4px 0 #000, 4px -4px 0 #000,
+                -4px 4px 0 #000, 4px 4px 0 #000,
+                -5px 0 0 #000, 5px 0 0 #000,
+                0 -5px 0 #000, 0 5px 0 #000,
+                -3px -3px 0 #000, 3px -3px 0 #000,
+                -3px 3px 0 #000, 3px 3px 0 #000;
+              line-height: 1.5;
+            ">
+              整理券<span style="
+                font-size: 96px;
+                color: #FFD700;
+                text-shadow: 
+                  -5px -5px 0 #000, 5px -5px 0 #000,
+                  -5px 5px 0 #000, 5px 5px 0 #000,
+                  -6px 0 0 #000, 6px 0 0 #000,
+                  0 -6px 0 #000, 0 6px 0 #000,
+                  -4px -4px 0 #000, 4px -4px 0 #000,
+                  -4px 4px 0 #000, 4px 4px 0 #000;
+              ">${toFullWidth(counter)}</span>番まで並びに来てください
+            </div>
+          </div>
+        `;
+        return;
+      }
+      
+      // mode=control: スマホ操作用（番号と操作パネルのみ）
+      if (mode === 'control') {
+        root.innerHTML = `
+          <div class="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-4">
+            <!-- 現在の番号表示 -->
+            <div class="text-center mb-8">
+              <div class="text-gray-400 text-2xl mb-2">現在の整理券番号</div>
+              <div class="text-white text-9xl font-bold">${toFullWidth(counter)}</div>
+            </div>
+
+            <!-- 操作パネル -->
+            <div class="w-full max-w-md space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <button id="dec-btn" class="bg-red-600 active:bg-red-700 text-white font-bold py-12 rounded-xl text-4xl shadow-lg">
+                  −
+                </button>
+                <button id="inc-btn" class="bg-green-600 active:bg-green-700 text-white font-bold py-12 rounded-xl text-4xl shadow-lg">
+                  ＋
+                </button>
+              </div>
+              <button id="reset-btn" class="w-full bg-blue-600 active:bg-blue-700 text-white font-bold py-6 rounded-xl text-xl shadow-lg">
+                リセット（1に戻す）
+              </button>
+            </div>
+          </div>
+        `;
+        
+        document.getElementById('dec-btn').onclick = () => 
+          updateCounter(Math.max(1, counter - 1));
+        document.getElementById('inc-btn').onclick = () => 
+          updateCounter(counter + 1);
+        document.getElementById('reset-btn').onclick = () => 
+          updateCounter(1);
+        return;
+      }
+      
+      // mode=full: デフォルト（全て表示）
       root.innerHTML = `
         <div class="flex flex-col items-center justify-center min-h-screen bg-transparent p-8">
           <!-- OBS表示用テキスト -->
@@ -75,36 +197,24 @@
             font-weight: bold;
             color: white;
             text-shadow: 
-              -4px -4px 0 #000,
-              4px -4px 0 #000,
-              -4px 4px 0 #000,
-              4px 4px 0 #000,
-              -5px 0 0 #000,
-              5px 0 0 #000,
-              0 -5px 0 #000,
-              0 5px 0 #000,
-              -3px -3px 0 #000,
-              3px -3px 0 #000,
-              -3px 3px 0 #000,
-              3px 3px 0 #000;
+              -4px -4px 0 #000, 4px -4px 0 #000,
+              -4px 4px 0 #000, 4px 4px 0 #000,
+              -5px 0 0 #000, 5px 0 0 #000,
+              0 -5px 0 #000, 0 5px 0 #000,
+              -3px -3px 0 #000, 3px -3px 0 #000,
+              -3px 3px 0 #000, 3px 3px 0 #000;
             line-height: 1.5;
           ">
             整理券<span style="
               font-size: 96px;
               color: #FFD700;
               text-shadow: 
-                -5px -5px 0 #000,
-                5px -5px 0 #000,
-                -5px 5px 0 #000,
-                5px 5px 0 #000,
-                -6px 0 0 #000,
-                6px 0 0 #000,
-                0 -6px 0 #000,
-                0 6px 0 #000,
-                -4px -4px 0 #000,
-                4px -4px 0 #000,
-                -4px 4px 0 #000,
-                4px 4px 0 #000;
+                -5px -5px 0 #000, 5px -5px 0 #000,
+                -5px 5px 0 #000, 5px 5px 0 #000,
+                -6px 0 0 #000, 6px 0 0 #000,
+                0 -6px 0 #000, 0 6px 0 #000,
+                -4px -4px 0 #000, 4px -4px 0 #000,
+                -4px 4px 0 #000, 4px 4px 0 #000;
             ">${toFullWidth(counter)}</span>番まで並びに来てください
           </div>
 
@@ -128,7 +238,6 @@
         </div>
       `;
 
-      // イベントリスナーを設定
       document.getElementById('dec-btn').onclick = () => 
         updateCounter(Math.max(1, counter - 1));
       document.getElementById('inc-btn').onclick = () => 
