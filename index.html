@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS用カウンター</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: transparent;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="module">
+    const API_URL = '/api/counter';
+    
+    // 半角数字を全角数字に変換
+    function toFullWidth(num) {
+      return String(num).replace(/[0-9]/g, (s) => 
+        String.fromCharCode(s.charCodeAt(0) + 0xFEE0)
+      );
+    }
+
+    let counter = 1;
+    let isUpdating = false;
+
+    async function fetchCounter() {
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        counter = data.value;
+        render();
+      } catch (error) {
+        console.error('取得エラー:', error);
+      }
+    }
+
+    async function updateCounter(newValue) {
+      if (isUpdating) return;
+      isUpdating = true;
+      
+      try {
+        counter = newValue;
+        render();
+        
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: newValue })
+        });
+      } catch (error) {
+        console.error('更新エラー:', error);
+      } finally {
+        isUpdating = false;
+      }
+    }
+
+    function render() {
+      const root = document.getElementById('root');
+      root.innerHTML = `
+        <div class="flex flex-col items-center justify-center min-h-screen bg-transparent p-8">
+          <!-- OBS表示用テキスト -->
+          <div class="text-center mb-32" style="
+            font-size: 64px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 
+              -4px -4px 0 #000,
+              4px -4px 0 #000,
+              -4px 4px 0 #000,
+              4px 4px 0 #000,
+              -5px 0 0 #000,
+              5px 0 0 #000,
+              0 -5px 0 #000,
+              0 5px 0 #000,
+              -3px -3px 0 #000,
+              3px -3px 0 #000,
+              -3px 3px 0 #000,
+              3px 3px 0 #000;
+            line-height: 1.5;
+          ">
+            整理券<span style="
+              font-size: 96px;
+              color: #FFD700;
+              text-shadow: 
+                -5px -5px 0 #000,
+                5px -5px 0 #000,
+                -5px 5px 0 #000,
+                5px 5px 0 #000,
+                -6px 0 0 #000,
+                6px 0 0 #000,
+                0 -6px 0 #000,
+                0 6px 0 #000,
+                -4px -4px 0 #000,
+                4px -4px 0 #000,
+                -4px 4px 0 #000,
+                4px 4px 0 #000;
+            ">${toFullWidth(counter)}</span>番まで並びに来てください
+          </div>
+
+          <!-- 操作パネル -->
+          <div class="bg-gray-800 bg-opacity-90 p-6 rounded-lg shadow-lg">
+            <div class="flex gap-4 mb-4">
+              <button id="dec-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded text-2xl">
+                −
+              </button>
+              <button id="inc-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded text-2xl">
+                ＋
+              </button>
+            </div>
+            <button id="reset-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              リセット（1に戻す）
+            </button>
+            <div class="text-white text-sm mt-4 text-center opacity-75">
+              現在の値: ${toFullWidth(counter)}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // イベントリスナーを設定
+      document.getElementById('dec-btn').onclick = () => 
+        updateCounter(Math.max(1, counter - 1));
+      document.getElementById('inc-btn').onclick = () => 
+        updateCounter(counter + 1);
+      document.getElementById('reset-btn').onclick = () => 
+        updateCounter(1);
+    }
+
+    // 初回読み込み
+    fetchCounter();
+
+    // 定期的に同期（1秒ごと）
+    setInterval(fetchCounter, 1000);
+  </script>
+</body>
+</html>
