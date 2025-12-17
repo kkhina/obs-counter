@@ -26,7 +26,7 @@
     
     // URLパラメータを取得
     const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode') || 'full'; // full, display, control
+    const mode = params.get('mode') || 'full';
     
     // 半角数字を全角数字に変換
     function toFullWidth(num) {
@@ -36,37 +36,52 @@
     }
 
     let counter = 1;
-    let isUpdating = false;
+    let pendingUpdate = null;
+    let lastFetchTime = 0;
+    let isFetching = false;
 
     async function fetchCounter() {
+      // 更新中は取得をスキップ
+      if (pendingUpdate || isFetching) return;
+      
+      isFetching = true;
       try {
         const res = await fetch(API_URL);
         const data = await res.json();
         counter = data.value;
+        lastFetchTime = Date.now();
         render();
       } catch (error) {
         console.error('取得エラー:', error);
+      } finally {
+        isFetching = false;
       }
     }
 
     async function updateCounter(newValue) {
-      if (isUpdating) return;
-      isUpdating = true;
+      // 即座にUIを更新（楽観的更新）
+      counter = newValue;
+      render();
       
-      try {
-        counter = newValue;
-        render();
-        
-        await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: newValue })
-        });
-      } catch (error) {
-        console.error('更新エラー:', error);
-      } finally {
-        isUpdating = false;
+      // 既存の更新をキャンセル
+      if (pendingUpdate) {
+        clearTimeout(pendingUpdate);
       }
+      
+      // 少し待ってからサーバーに送信（デバウンス）
+      pendingUpdate = setTimeout(async () => {
+        try {
+          await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: newValue })
+          });
+        } catch (error) {
+          console.error('更新エラー:', error);
+        } finally {
+          pendingUpdate = null;
+        }
+      }, 200); // 200ms待つ
     }
 
     function render() {
@@ -203,8 +218,8 @@
     // 初回読み込み
     fetchCounter();
 
-    // 定期的に同期（1秒ごと）
-    setInterval(fetchCounter, 1000);
+    // 定期的に同期（2秒ごと、更新中はスキップ）
+    setInterval(fetchCounter, 2000);
   </script>
 </body>
 </html>
