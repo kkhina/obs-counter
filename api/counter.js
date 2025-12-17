@@ -1,5 +1,15 @@
+import Redis from 'ioredis';
+
+let redis;
+
+function getRedis() {
+  if (!redis) {
+    redis = new Redis(process.env.REDIS_URL);
+  }
+  return redis;
+}
+
 export default async function handler(req, res) {
-  // CORSヘッダーを設定
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -8,20 +18,24 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Vercel KVを動的にインポート
-  const { kv } = await import('@vercel/kv');
   const KEY = 'obs-counter-value';
+  const client = getRedis();
 
-  if (req.method === 'GET') {
-    const value = await kv.get(KEY) || 1;
-    return res.json({ value: parseInt(value) });
+  try {
+    if (req.method === 'GET') {
+      const value = await client.get(KEY);
+      return res.json({ value: parseInt(value) || 1 });
+    }
+
+    if (req.method === 'POST') {
+      const { value } = req.body;
+      await client.set(KEY, value);
+      return res.json({ value: parseInt(value) });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    console.error('Redis error:', error);
+    return res.status(500).json({ error: error.message });
   }
-
-  if (req.method === 'POST') {
-    const { value } = req.body;
-    await kv.set(KEY, value);
-    return res.json({ value: parseInt(value) });
-  }
-
-  return res.status(405).json({ error: 'Method not allowed' });
 }
