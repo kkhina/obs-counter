@@ -24,13 +24,14 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const value = await client.get(KEY);
-      return res.json({ value: parseInt(value) || 1 });
+      return res.status(200).json({ value: parseInt(value) || 1 });
     }
 
     if (req.method === 'POST') {
-      const { value } = req.body;
-      await client.set(KEY, value);
-      return res.json({ value: parseInt(value) });
+      // bodyの取得方法を修正
+      const { value } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      await client.set(KEY, String(value));
+      return res.status(200).json({ value: parseInt(value) });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
